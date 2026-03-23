@@ -47,11 +47,18 @@ Claude Code (or any MCP client)
    +-----------+  +----------------+
 ```
 
+### Startup & Project Root
+
+The `--project` CLI argument is parsed in `index.ts` at startup and validated (must be an existing directory). This project root is passed to:
+- **File Indexer** — as the root directory to walk and index
+- **LSP Manager** — as the `rootUri` in the LSP `initialize` request
+- **Response Shaper** — for computing relative paths
+
 ### Layers
 
 1. **MCP Server Layer** — Registers tools, handles MCP protocol via `@modelcontextprotocol/sdk`. Entry point for all requests.
 2. **LSP Manager** — Auto-detects language from file extension, spawns the right language server on first use, caches it for the session, handles LSP initialization handshake.
-3. **Response Shaper** — Takes verbose LSP responses, returns compact `{file, line, symbol, snippet}` with optional enrichment via boolean flags.
+3. **Response Shaper** — Takes verbose LSP responses, returns compact `{file, line, symbol, snippet}` with optional enrichment via boolean flags. Reads files from disk directly to build code snippets (does not rely on LSP hover data).
 4. **File Indexer** — Builds an in-memory index of all file paths at startup. Supports fuzzy file name matching and targeted re-indexing.
 
 ## MCP Tools
@@ -99,27 +106,31 @@ Jump to the definition of a symbol at a given position.
 - `column` (number, required) — 1-based column number
 - Enrichment flags (optional)
 
-**Response (default):**
+**Response (default):** Array of locations (LSP can return multiple definitions for overloads, type unions, re-exports).
 ```json
-{
-  "file": "/absolute/path/to/file.ts",
-  "line": 42,
-  "symbol": "handleRequest",
-  "snippet": "  async handleRequest(req: Request): Promise<Response> {\n    const body = await req.json();\n    return this.process(body);"
-}
+[
+  {
+    "file": "/absolute/path/to/file.ts",
+    "line": 42,
+    "symbol": "handleRequest",
+    "snippet": "  async handleRequest(req: Request): Promise<Response> {\n    const body = await req.json();\n    return this.process(body);"
+  }
+]
 ```
 
 **Response (with enrichment):**
 ```json
-{
-  "file": "/absolute/path/to/file.ts",
-  "line": 42,
-  "symbol": "handleRequest",
-  "kind": "method",
-  "container": "RequestHandler",
-  "docstring": "Processes an incoming HTTP request and returns a response.",
-  "snippet": "  async handleRequest(req: Request): Promise<Response> {\n    ..."
-}
+[
+  {
+    "file": "/absolute/path/to/file.ts",
+    "line": 42,
+    "symbol": "handleRequest",
+    "kind": "method",
+    "container": "RequestHandler",
+    "docstring": "Processes an incoming HTTP request and returns a response.",
+    "snippet": "  async handleRequest(req: Request): Promise<Response> {\n    ..."
+  }
+]
 ```
 
 #### `find_references`
@@ -166,13 +177,17 @@ All responses follow these rules:
 - **Snippet:** 3 lines (definition line + 2 below). Read from the file directly rather than relying on LSP hover data.
 - **Enrichment flags:** Boolean parameters (`includeKind`, `includeContainer`, `includeDocstring`) that add metadata fields to the response when set to true
 - **Paths:** Always absolute. `find_file` additionally includes `relativePath`.
+- **Hierarchy:** `document_symbols` intentionally flattens hierarchical LSP responses into a flat list. Nested symbols (e.g., methods inside a class) appear at the top level with their `container` field set when `includeContainer` is true.
+- **Errors:** On failure (file not found, LSP not available, timeout, unsupported language), tools return an MCP error with a human-readable message. Example: `{ "error": "No language server available for .rs files. Configure one in config.json." }`
 
 ## LSP Manager
 
 ### Auto-detection
 Routes requests to the correct language server based on file extension:
 - `.ts`, `.tsx`, `.js`, `.jsx` → `typescript-language-server --stdio`
-- `.java` → `eclipse.jdt.ls` (via `jdtls` launcher)
+- `.java` → `eclipse.jdt.ls` (via `jdtls` wrapper script)
+
+**Note on JDT LS:** The Java default assumes the `jdtls` wrapper script is installed (via Mason, Homebrew, or manual install). The server auto-creates a workspace data directory at `/tmp/jdtls-workspace-<project-hash>/` per project. Users can override the command, args, and add environment variables (e.g., for Lombok agent) via `config.json`.
 
 ### Lifecycle
 - LSP instances spawned on first request for a given language
@@ -180,6 +195,13 @@ Routes requests to the correct language server based on file extension:
 - Instances cached for the MCP server's lifetime (matches the Claude Code session)
 - Graceful shutdown: sends LSP `shutdown` + `exit` on SIGTERM/SIGINT
 - Crash recovery: if an LSP process dies, it's restarted on the next request for that language
+- **Request timeout:** LSP requests time out after 10 seconds by default (configurable in `config.json`). On timeout, the MCP tool returns an error rather than blocking indefinitely. This is especially important for JDT LS which can be slow during initial indexing.
+
+### Document Lifecycle
+- When a tool request references a file, the LSP client sends `textDocument/didOpen` if the file is not already tracked as open.
+- Documents are kept open for the duration of the MCP server session to avoid repeated open/close overhead.
+- On MCP server shutdown, `textDocument/didClose` is sent for all open documents before the LSP `shutdown` sequence.
+- The LSP client tracks open documents in a `Set<string>` keyed by file URI.
 
 ### Configuration
 Optional `config.json` at the project root to override language server commands:
@@ -192,9 +214,13 @@ Optional `config.json` at the project root to override language server commands:
     },
     "java": {
       "command": "jdtls",
-      "args": []
+      "args": [],
+      "env": {
+        "JDTLS_JVM_ARGS": "-javaagent:/path/to/lombok.jar"
+      }
     }
-  }
+  },
+  "requestTimeout": 10000
 }
 ```
 
