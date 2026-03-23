@@ -2135,33 +2135,41 @@ Replace the TODO stub in the `workspace_symbol` tool handler:
 
 ```typescript
 async ({ query, maxResults, ...flags }) => {
-  const clients = lspManager.allClients();
-  if (clients.length === 0) {
+  try {
+    const clients = lspManager.allClients();
+    if (clients.length === 0) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({
+            error: "No language servers are running. Use go_to_definition or document_symbols on a file first to start a language server."
+          }),
+        }],
+        isError: true,
+      };
+    }
+
+    const allResults: any[] = [];
+    for (const client of clients) {
+      const symbols = await client.workspaceSymbols(query);
+      if (symbols) {
+        const shaped = await shaper.shapeSymbols(symbols, flags);
+        allResults.push(...shaped);
+      }
+    }
+
     return {
       content: [{
         type: "text" as const,
-        text: JSON.stringify({
-          error: "No language servers are running. Use go_to_definition or document_symbols on a file first to start a language server."
-        }),
+        text: JSON.stringify(allResults.slice(0, maxResults), null, 2),
       }],
     };
+  } catch (err: any) {
+    return {
+      content: [{ type: "text" as const, text: JSON.stringify({ error: err.message }) }],
+      isError: true,
+    };
   }
-
-  const allResults: any[] = [];
-  for (const client of clients) {
-    const symbols = await client.workspaceSymbols(query);
-    if (symbols) {
-      const shaped = await shaper.shapeSymbols(symbols, flags);
-      allResults.push(...shaped);
-    }
-  }
-
-  return {
-    content: [{
-      type: "text" as const,
-      text: JSON.stringify(allResults.slice(0, maxResults), null, 2),
-    }],
-  };
 }
 ```
 
