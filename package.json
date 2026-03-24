@@ -1,8 +1,24 @@
 {
   "name": "lsp-mcp-server",
+  "version": "0.1.0",
+  "description": "Lightweight MCP server providing type-aware code navigation and fast file search via language servers",
   "module": "index.ts",
   "type": "module",
-  "private": true,
+  "bin": {
+    "lsp-mcp-server": "./src/index.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/garretpremo/lsp-mcp-server"
+  },
+  "author": "Garret Premo",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "lsp",
+    "code-navigation",
+    "language-server"
+  ],
   "devDependencies": {
     "@types/bun": "latest"
   },
