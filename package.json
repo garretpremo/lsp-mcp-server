@@ -1,0 +1,17 @@
+{
+  "name": "lsp-mcp-server",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "ignore": "^7.0.5",
+    "vscode-languageserver-protocol": "^3.17.5"
+  }
+}
