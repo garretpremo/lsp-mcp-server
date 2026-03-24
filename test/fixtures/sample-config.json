@@ -1,0 +1,9 @@
+{
+  "languageServers": {
+    "typescript": {
+      "command": "custom-ts-server",
+      "args": ["--stdio", "--verbose"]
+    }
+  },
+  "requestTimeout": 5000
+}
