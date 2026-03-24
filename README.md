@@ -2,15 +2,55 @@
 
 A lightweight [MCP](https://modelcontextprotocol.io) server that exposes type-aware code navigation and fast file search to AI agents via language servers. It manages language server processes on demand, routes LSP requests from MCP tool calls, and returns structured results — letting agents jump to definitions, find references, list symbols, and locate files without reading entire codebases.
 
-## Quick Start
+## Installation
+
+### Option 1: Claude Code Plugin (recommended)
+
+One command to clone, install, and register as a Claude Code plugin:
 
 ```bash
-# Install dependencies (requires Bun)
-bun install
+git clone https://github.com/garretpremo/lsp-mcp-server.git ~/.local/share/lsp-mcp-server \
+  && cd ~/.local/share/lsp-mcp-server && bun install \
+  && bash scripts/install-plugin.sh
+```
 
-# Run against a project
+Restart Claude Code (or run `/reload-plugins`) to activate. The plugin adds a skill that guides Claude on when to use each tool, plus the MCP server runs automatically for each project.
+
+### Option 2: Per-session (no install)
+
+```bash
+git clone https://github.com/garretpremo/lsp-mcp-server.git ~/tools/lsp-mcp-server \
+  && cd ~/tools/lsp-mcp-server && bun install
+```
+
+Then start Claude Code with:
+
+```bash
+claude --plugin-dir ~/tools/lsp-mcp-server/plugin
+```
+
+### Option 3: Manual MCP config
+
+Add to your project's `.mcp.json` or `~/.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "lsp-mcp-server": {
+      "command": "bun",
+      "args": ["run", "/path/to/lsp-mcp-server/src/index.ts", "--project", "."]
+    }
+  }
+}
+```
+
+### Option 4: Standalone (any MCP client)
+
+```bash
 bun run src/index.ts --project /path/to/your/project
 ```
+
+Communicates via stdio JSON-RPC — works with any MCP-compatible client.
 
 ## Available Tools
 
@@ -89,10 +129,6 @@ Tested against a 4,381-file Angular/TypeScript project (Nx monorepo).
 - **27% fewer tokens** consumed by the agent
 - Structured symbol data vs raw text
 - True LSP semantics vs text-based grep
-
-## Claude Code Plugin
-
-The `plugin/` directory contains a Claude Code skill that wraps the MCP tools with higher-level search workflows. To use it, add the plugin path to your Claude Code configuration.
 
 ## Prerequisites
 
