@@ -47,6 +47,49 @@ Place a `config.json` in your project root to override language server commands 
 
 If no `config.json` is found, defaults are used. `requestTimeout` is in milliseconds (default: `10000`).
 
+## Benchmarks: lsp-mcp-server vs JetBrains MCP
+
+Tested against a 4,381-file Angular/TypeScript project (Nx monorepo).
+
+### File Search — "document-viewer"
+
+| | lsp-mcp-server | JetBrains MCP |
+|--|---|---|
+| **Response size** | ~1,500 chars | 9,792 chars |
+| **Results** | 10 files, ranked by relevance | 40 items (files + dirs), unranked, duplicated by worktrees |
+| **Format** | Absolute + relative paths | Flat path list with worktree duplicates |
+
+### Document Symbols — `reports.service.ts`
+
+| | lsp-mcp-server | JetBrains MCP |
+|--|---|---|
+| **Response size** | ~5,200 chars | 4,486 chars |
+| **Result type** | 31 structured symbols (name, kind, container, snippet) | Raw file text (no symbols tool available) |
+| **Structured** | Yes — class, method, property with hierarchy | No — LLM must parse symbols from raw text |
+
+### Go To Definition — `HttpClient` import
+
+| | lsp-mcp-server | JetBrains MCP |
+|--|---|---|
+| **Response size** | ~550 chars | 34,868 chars |
+| **Result type** | 1 precise definition location | 50 text matches (grep-style, not semantic) |
+| **Semantic** | Yes — LSP-powered, type-aware | No — text search with `search_in_files_by_text` |
+
+### Agent Token Usage (identical tasks, Sonnet model)
+
+| | lsp-mcp-server | JetBrains MCP |
+|--|---|---|
+| **Total tokens** | 18,910 | 25,994 |
+| **Tool calls** | 3 | 10 |
+
+### Summary
+
+- **6.5x smaller** file search responses
+- **63x smaller** definition lookup responses
+- **27% fewer tokens** consumed by the agent
+- Structured symbol data vs raw text
+- True LSP semantics vs text-based grep
+
 ## Claude Code Plugin
 
 The `plugin/` directory contains a Claude Code skill that wraps the MCP tools with higher-level search workflows. To use it, add the plugin path to your Claude Code configuration.
