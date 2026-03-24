@@ -1,0 +1,11 @@
+{
+  "name": "lsp-mcp-server",
+  "version": "0.1.0",
+  "description": "Lightweight MCP server providing type-aware code navigation and fast file search via language servers",
+  "author": {
+    "name": "Garret Premo"
+  },
+  "repository": "https://github.com/garretpremo/lsp-mcp-server",
+  "license": "MIT",
+  "keywords": ["lsp", "code-navigation", "file-search"]
+}
