@@ -59,7 +59,7 @@ from datetime import datetime, timezone
 with open('$KNOWN_MARKETPLACES') as f:
     data = json.load(f)
 data['local'] = {
-    'source': {'source': 'local', 'path': '$MARKETPLACE_DIR'},
+    'source': {'source': 'directory', 'path': '$MARKETPLACE_DIR'},
     'installLocation': '$MARKETPLACE_DIR',
     'lastUpdated': datetime.now(timezone.utc).isoformat()
 }
